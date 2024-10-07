@@ -11,6 +11,12 @@ def get_user_analytics_data(token: str):
         raise HTTPException(status_code=400, detail="Error fetching analytics accounts")
 
     accounts_data = response.json()
+        
+    if not accounts_data.get('items'):
+        return {"detail": "No Google Analytics accounts found for this user."}
+    
+    return accounts_data  # Return the accounts data
+
     
     # Get the first account and its view ID for simplicity
     account_id = accounts_data['items'][0]['id']  # Get the user's first account
