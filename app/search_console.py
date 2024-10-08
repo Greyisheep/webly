@@ -8,18 +8,23 @@ def get_user_search_console_data(token: str):
     site_list_url = "https://www.googleapis.com/webmasters/v3/sites"
     response = requests.get(site_list_url, headers=headers)
     
-    # Check if the response contains valid data
-    sites_data = response.json()
     if response.status_code != 200:
-        raise HTTPException(status_code=response.status_code, detail="Error fetching Search Console sites")
+        error_message = response.json().get("error", {}).get("message", "Unknown error")
+        raise HTTPException(status_code=response.status_code, detail=f"Error fetching Search Console sites: {error_message}")
 
+    sites_data = response.json()
+    
     # Check if 'siteEntry' exists before accessing it
     if 'siteEntry' not in sites_data:
-        raise HTTPException(status_code=404, detail="No sites found for the user in Search Console")
+        raise HTTPException(status_code=404, detail="No sites found for the user in Search Console. Ensure the user has access to a verified site.")
 
-    # Proceed only if the 'siteEntry' is present
+    # Proceed only if 'siteEntry' is present
     site_url = sites_data['siteEntry'][0]['siteUrl']
-
+    
+    # Ensure the site URL is correct (e.g., matches the verified domain format)
+    if not site_url.startswith("sc-domain:"):
+        raise HTTPException(status_code=400, detail="Invalid Search Console site URL format.")
+    
     # Use this site URL to get the search analytics data
     search_console_data_url = f"https://www.googleapis.com/webmasters/v3/sites/{site_url}/searchAnalytics/query"
     data = {
@@ -29,7 +34,13 @@ def get_user_search_console_data(token: str):
     }
 
     search_console_response = requests.post(search_console_data_url, headers=headers, json=data)
+    
+    if search_console_response.status_code != 200:
+        error_message = search_console_response.json().get("error", {}).get("message", "Unknown error")
+        raise HTTPException(status_code=search_console_response.status_code, detail=f"Error fetching Search Console data: {error_message}")
+    
     return search_console_response.json()
+
 
 
 

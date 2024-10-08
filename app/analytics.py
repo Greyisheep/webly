@@ -9,15 +9,15 @@ def get_user_analytics_data(token: str):
     response = requests.get(analytics_accounts_url, headers=headers)
     
     if response.status_code != 200:
-        # Check for the actual error message from the API
         error_message = response.json().get("error", {}).get("message", "Unknown error")
         raise HTTPException(status_code=400, detail=f"Error fetching analytics accounts: {error_message}")
 
     accounts_data = response.json()
 
     if not accounts_data.get('items'):
+        # User has no Google Analytics accounts
         return {"detail": "No Google Analytics accounts found for this user."}
-    
+
     # Get the first account's ID
     account_id = accounts_data['items'][0]['id']
     property_url = f"https://analytics.googleapis.com/analytics/v3/management/accounts/{account_id}/webproperties"
@@ -32,7 +32,9 @@ def get_user_analytics_data(token: str):
     properties_data = properties_response.json()
 
     if not properties_data.get('items'):
-        return {"detail": "No web properties found for this user."}
+        # No web properties found for the user
+        return {"detail": "No web properties found for this user. Please ensure you have Google Analytics set up."}
+
     
     # Get the first web property and view
     web_property_id = properties_data['items'][0]['id']
