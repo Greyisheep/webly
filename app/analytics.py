@@ -2,50 +2,73 @@ from fastapi import HTTPException
 import requests
 
 def get_user_analytics_data(token: str):
-    # Get all Analytics accounts for this user
     headers = {"Authorization": f"Bearer {token}"}
     analytics_accounts_url = "https://analytics.googleapis.com/analytics/v3/management/accounts"
     
+    # Fetch Analytics Accounts
     response = requests.get(analytics_accounts_url, headers=headers)
+    
     if response.status_code != 200:
-        raise HTTPException(status_code=400, detail="Error fetching analytics accounts")
+        # Check for the actual error message from the API
+        error_message = response.json().get("error", {}).get("message", "Unknown error")
+        raise HTTPException(status_code=400, detail=f"Error fetching analytics accounts: {error_message}")
 
     accounts_data = response.json()
-        
+
     if not accounts_data.get('items'):
         return {"detail": "No Google Analytics accounts found for this user."}
     
-    # return accounts_data  # Return the accounts data
-
-# Add the ability 
-
-    # Get the first account and its view ID for simplicity
-    account_id = accounts_data['items'][0]['id']  # Get the user's first account
+    # Get the first account's ID
+    account_id = accounts_data['items'][0]['id']
     property_url = f"https://analytics.googleapis.com/analytics/v3/management/accounts/{account_id}/webproperties"
     
+    # Fetch Web Properties
     properties_response = requests.get(property_url, headers=headers)
-    properties_data = properties_response.json()
     
-    # Get the first web property for simplicity
+    if properties_response.status_code != 200:
+        error_message = properties_response.json().get("error", {}).get("message", "Unknown error")
+        raise HTTPException(status_code=400, detail=f"Error fetching web properties: {error_message}")
+    
+    properties_data = properties_response.json()
+
+    if not properties_data.get('items'):
+        return {"detail": "No web properties found for this user."}
+    
+    # Get the first web property and view
     web_property_id = properties_data['items'][0]['id']
     view_url = f"https://analytics.googleapis.com/analytics/v3/management/accounts/{account_id}/webproperties/{web_property_id}/profiles"
     
+    # Fetch Views
     views_response = requests.get(view_url, headers=headers)
+    
+    if views_response.status_code != 200:
+        error_message = views_response.json().get("error", {}).get("message", "Unknown error")
+        raise HTTPException(status_code=400, detail=f"Error fetching views: {error_message}")
+    
     views_data = views_response.json()
 
-    view_id = views_data['items'][0]['id']  # Get the user's first view ID
+    if not views_data.get('items'):
+        return {"detail": "No views found for this user."}
 
-    # Now use the view_id to get analytics data
-    analytics_data_url = "https://analytics.googleapis.com/v3/data/ga"
+    view_id = views_data['items'][0]['id']
+    
+    # Fetch Analytics Data using view ID
+    analytics_data_url = "https://analytics.googleapis.com/analytics/v4/data/ga"
     params = {
-        "ids": f"ga:{view_id}",  # Use the user's view ID
+        "ids": f"ga:{view_id}",
         "start-date": "30daysAgo",
         "end-date": "today",
         "metrics": "ga:sessions,ga:bounceRate"
     }
 
     analytics_response = requests.get(analytics_data_url, headers=headers, params=params)
+
+    if analytics_response.status_code != 200:
+        error_message = analytics_response.json().get("error", {}).get("message", "Unknown error")
+        raise HTTPException(status_code=400, detail=f"Error fetching analytics data: {error_message}")
+
     return analytics_response.json()
+
 
 
 

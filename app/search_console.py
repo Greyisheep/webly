@@ -7,12 +7,17 @@ def get_user_search_console_data(token: str):
     # Get the list of sites for this user
     site_list_url = "https://www.googleapis.com/webmasters/v3/sites"
     response = requests.get(site_list_url, headers=headers)
-    if response.status_code != 200:
-        raise HTTPException(status_code=400, detail="Error fetching Search Console sites")
-
-    sites_data = response.json()
     
-    # Get the first site for simplicity
+    # Check if the response contains valid data
+    sites_data = response.json()
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail="Error fetching Search Console sites")
+
+    # Check if 'siteEntry' exists before accessing it
+    if 'siteEntry' not in sites_data:
+        raise HTTPException(status_code=404, detail="No sites found for the user in Search Console")
+
+    # Proceed only if the 'siteEntry' is present
     site_url = sites_data['siteEntry'][0]['siteUrl']
 
     # Use this site URL to get the search analytics data

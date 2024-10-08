@@ -5,7 +5,7 @@ from fastapi import HTTPException
 # Environment variables for Google API credentials
 CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-REDIRECT_URI = os.getenv("REDIRECT_URI", "http://localhost:8000/callback")
+REDIRECT_URI = os.getenv("REDIRECT_URI") #, "http://localhost:8000/callback")
 SCOPE = (
     "https://www.googleapis.com/auth/analytics.readonly " # check google api documentation for extra permissions
     "https://www.googleapis.com/auth/webmasters.readonly "
