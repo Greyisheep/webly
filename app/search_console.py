@@ -21,9 +21,9 @@ def get_user_search_console_data(token: str):
     # Proceed only if 'siteEntry' is present
     site_url = sites_data['siteEntry'][0]['siteUrl']
     
-    # Ensure the site URL is correct (e.g., matches the verified domain format)
-    if not site_url.startswith("sc-domain:"):
-        raise HTTPException(status_code=400, detail="Invalid Search Console site URL format.")
+    # Check if the site URL format is valid
+    if not (site_url.startswith("sc-domain:") or site_url.startswith("http://") or site_url.startswith("https://")):
+        raise HTTPException(status_code=400, detail=f"Invalid Search Console site URL format: {site_url}")
     
     # Use this site URL to get the search analytics data
     search_console_data_url = f"https://www.googleapis.com/webmasters/v3/sites/{site_url}/searchAnalytics/query"
@@ -40,6 +40,7 @@ def get_user_search_console_data(token: str):
         raise HTTPException(status_code=search_console_response.status_code, detail=f"Error fetching Search Console data: {error_message}")
     
     return search_console_response.json()
+
 
 
 
