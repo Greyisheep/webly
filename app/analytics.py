@@ -15,9 +15,10 @@ def get_user_analytics_data(token: str):
     if not accounts_data.get('items'):
         return {"detail": "No Google Analytics accounts found for this user."}
     
-    return accounts_data  # Return the accounts data
+    # return accounts_data  # Return the accounts data
 
-    
+# Add the ability 
+
     # Get the first account and its view ID for simplicity
     account_id = accounts_data['items'][0]['id']  # Get the user's first account
     property_url = f"https://analytics.googleapis.com/analytics/v3/management/accounts/{account_id}/webproperties"
