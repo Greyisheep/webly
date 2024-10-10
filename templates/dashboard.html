@@ -8,17 +8,52 @@
 </head>
 <body>
     <h1>WeBintel Dashboard</h1>
+    
     <div>
         <h2>User Data</h2>
-        <p>User information will be displayed here.</p>
+        <p id="user-data">User information will be displayed here.</p>
     </div>
+
     <div>
         <h2>Analytics Data</h2>
-        <p>Google Analytics data will be displayed here.</p>
+        <button onclick="fetchAnalyticsData()">Fetch Analytics Data</button>
+        <p id="analytics-data">Google Analytics data will be displayed here.</p>
     </div>
+
     <div>
         <h2>Search Console Data</h2>
-        <p>Google Search Console data will be displayed here.</p>
+        <button onclick="fetchSearchConsoleData()">Fetch Search Console Data</button>
+        <p id="search-console-data">Google Search Console data will be displayed here.</p>
     </div>
+
+    <script>
+        async function fetchAnalyticsData() {
+            try {
+                const response = await fetch('/get-analytics');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('analytics-data').textContent = JSON.stringify(data.analytics_data);
+                } else {
+                    console.error("Failed to fetch analytics data.");
+                }
+            } catch (error) {
+                console.error("Error fetching analytics data:", error);
+            }
+        }
+
+        async function fetchSearchConsoleData() {
+            try {
+                const response = await fetch('/get-search-console');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('search-console-data').textContent = JSON.stringify(data.search_console_data);
+                } else {
+                    console.error("Failed to fetch search console data.");
+                }
+            } catch (error) {
+                console.error("Error fetching search console data:", error);
+            }
+        }
+    </script>
 </body>
 </html>
