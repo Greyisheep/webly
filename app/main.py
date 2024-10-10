@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from app.oauth import get_google_auth_url, get_google_token
-# , get_user_data
 from app.analytics import get_user_analytics_data
 from app.search_console import get_user_search_console_data
 from fastapi.templating import Jinja2Templates
@@ -32,13 +31,11 @@ async def google_login():
 @app.get("/callback")
 async def oauth_callback(code: str):
     token = get_google_token(code)
-    # user_data = get_user_data(token)
     analytics_data = get_user_analytics_data(token)
-    search_console_data = get_user_search_console_data(token)
+    # search_console_data = get_user_search_console_data(token)
     return {
-        # "user_data": user_data,
         "analytics_data": analytics_data,
-        "search_console_data": search_console_data
+        # "search_console_data": search_console_data
     }
 
 # Serve HTML template after successful login
