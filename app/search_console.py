@@ -9,7 +9,10 @@ def get_user_search_console_data(token: str):
     response = requests.get(site_list_url, headers=headers)
     
     if response.status_code != 200:
-        error_message = response.json().get("error", {}).get("message", "Unknown error")
+        try:
+            error_message = response.json().get("error", {}).get("message", "Unknown error")
+        except ValueError:  # Catching JSONDecodeError
+            error_message = response.text  # Fall back to raw response text if it's not JSON
         raise HTTPException(status_code=response.status_code, detail=f"Error fetching Search Console sites: {error_message}")
 
     sites_data = response.json()
@@ -36,13 +39,13 @@ def get_user_search_console_data(token: str):
     search_console_response = requests.post(search_console_data_url, headers=headers, json=data)
     
     if search_console_response.status_code != 200:
-        error_message = search_console_response.json().get("error", {}).get("message", "Unknown error")
+        try:
+            error_message = search_console_response.json().get("error", {}).get("message", "Unknown error")
+        except ValueError:  # Catching JSONDecodeError
+            error_message = search_console_response.text  # Fall back to raw response text if it's not JSON
         raise HTTPException(status_code=search_console_response.status_code, detail=f"Error fetching Search Console data: {error_message}")
     
     return search_console_response.json()
-
-
-
 
 
 # def get_search_console_data(token: str):
