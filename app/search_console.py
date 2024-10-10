@@ -11,8 +11,8 @@ def get_user_search_console_data(token: str):
     if response.status_code != 200:
         try:
             error_message = response.json().get("error", {}).get("message", "Unknown error")
-        except ValueError:  # Catching JSONDecodeError
-            error_message = response.text  # Fall back to raw response text if it's not JSON
+        except ValueError:
+            error_message = response.text
         raise HTTPException(status_code=response.status_code, detail=f"Error fetching Search Console sites: {error_message}")
 
     sites_data = response.json()
@@ -21,8 +21,11 @@ def get_user_search_console_data(token: str):
     if 'siteEntry' not in sites_data:
         raise HTTPException(status_code=404, detail="No sites found for the user in Search Console. Ensure the user has access to a verified site.")
 
-    # Proceed only if 'siteEntry' is present
+    # Get the first available site URL
     site_url = sites_data['siteEntry'][0]['siteUrl']
+    
+    # Sanitize the site URL by removing any trailing slashes
+    site_url = site_url.rstrip('/')
     
     # Check if the site URL format is valid
     if not (site_url.startswith("sc-domain:") or site_url.startswith("http://") or site_url.startswith("https://")):
@@ -41,11 +44,12 @@ def get_user_search_console_data(token: str):
     if search_console_response.status_code != 200:
         try:
             error_message = search_console_response.json().get("error", {}).get("message", "Unknown error")
-        except ValueError:  # Catching JSONDecodeError
-            error_message = search_console_response.text  # Fall back to raw response text if it's not JSON
+        except ValueError:
+            error_message = search_console_response.text
         raise HTTPException(status_code=search_console_response.status_code, detail=f"Error fetching Search Console data: {error_message}")
     
     return search_console_response.json()
+
 
 
 # def get_search_console_data(token: str):
