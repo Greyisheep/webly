@@ -42,24 +42,25 @@ def get_user_analytics_data(token: str):
     headers = {"Authorization": f"Bearer {token}"}
     account_info = []
 
-    # Universal Analytics (UA) and GA4 fetching code as before...
-    
     # Fetch GA4 Properties and their metrics
     ga4_properties = get_ga4_properties(token)
     if ga4_properties.get("accountSummaries"):
         for account_summary in ga4_properties['accountSummaries']:
             account_name = account_summary.get('account', 'Unknown')
-            property_id = account_summary.get('propertySummaries', [{}])[0].get('property', 'Unknown')
-            
-            # Get GA4 metrics
-            metrics_data = get_ga4_metrics(token, property_id)
-            
-            account_info.append({
-                "account_id": account_name,
-                "property_id": property_id,
-                "metrics": metrics_data,
-                "status": "GA4 properties and metrics found"
-            })
+
+            # Loop through all property summaries for the account
+            for property_summary in account_summary.get('propertySummaries', []):
+                property_id = property_summary.get('property', 'Unknown')
+
+                # Get GA4 metrics
+                metrics_data = get_ga4_metrics(token, property_id)
+
+                account_info.append({
+                    "account_id": account_name,
+                    "property_id": property_id,
+                    "metrics": metrics_data,
+                    "status": "GA4 properties and metrics found"
+                })
     else:
         account_info.append({"detail": "No GA4 accounts found for this user."})
 
