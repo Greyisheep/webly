@@ -1,7 +1,10 @@
 from fastapi import HTTPException
 import requests
-from urllib.parse import quote
 import logging
+from urllib.parse import quote
+
+# Import the get_news_for_site function from news_fetcher.py
+from app.news_fetcher import get_news_for_site
 
 def get_user_search_console_data(token: str):
     headers = {"Authorization": f"Bearer {token}"}
@@ -57,7 +60,15 @@ def get_user_search_console_data(token: str):
             search_console_response.raise_for_status()  # Raises HTTPError for 4xx or 5xx responses
             
             # Store the response data for each site
-            all_sites_data[site_url] = search_console_response.json()
+            search_console_data = search_console_response.json()
+            
+            # Get the top 5 news links or headlines for this site
+            news_data = get_news_for_site(site_url)
+
+            all_sites_data[site_url] = {
+                "search_console_data": search_console_data,
+                "news": news_data  # Include news results here
+            }
         
         except requests.exceptions.HTTPError as http_err:
             error_message = search_console_response.json().get("error", {}).get("message", str(http_err))
@@ -81,6 +92,7 @@ def get_user_search_console_data(token: str):
 # from fastapi import HTTPException
 # import requests
 # from urllib.parse import quote
+# import logging
 
 # def get_user_search_console_data(token: str):
 #     headers = {"Authorization": f"Bearer {token}"}
@@ -106,6 +118,7 @@ def get_user_search_console_data(token: str):
     
 #     # Initialize a dictionary to store the data for each site
 #     all_sites_data = {}
+#     failed_sites = []  # List to track sites that encountered errors
 
 #     # Iterate over each site in the site list
 #     for site in sites_data['siteEntry']:
@@ -117,7 +130,6 @@ def get_user_search_console_data(token: str):
         
 #         # Determine the URL format for the API request
 #         if site_url.startswith("sc-domain:"):
-#             # No encoding needed for sc-domain
 #             search_console_data_url = f"https://www.googleapis.com/webmasters/v3/sites/{site_url}/searchAnalytics/query"
 #         else:
 #             # URL encode the site URL
@@ -125,25 +137,32 @@ def get_user_search_console_data(token: str):
 #             search_console_data_url = f"https://www.googleapis.com/webmasters/v3/sites/{encoded_site_url}/searchAnalytics/query"
         
 #         data = {
-#             "startDate": "2023-01-01",
-#             "endDate": "2023-01-30",
+#             "startDate": "2024-01-01",
+#             "endDate": "2024-09-30",
 #             "dimensions": ["query"],
 #             "rowLimit": 10
 #         }
 
-#         search_console_response = requests.post(search_console_data_url, headers=headers, json=data)
+#         try:
+#             search_console_response = requests.post(search_console_data_url, headers=headers, json=data)
+#             search_console_response.raise_for_status()  # Raises HTTPError for 4xx or 5xx responses
+            
+#             # Store the response data for each site
+#             all_sites_data[site_url] = search_console_response.json()
         
-#         if search_console_response.status_code != 200:
-#             try:
-#                 error_message = search_console_response.json().get("error", {}).get("message", "Unknown error")
-#             except ValueError:
-#                 error_message = f"Status: {search_console_response.status_code}, Content: {search_console_response.text}"
-#             raise HTTPException(
-#                 status_code=search_console_response.status_code, 
-#                 detail=f"Error fetching Search Console data for {site_url}: {error_message}"
-#             )
+#         except requests.exceptions.HTTPError as http_err:
+#             error_message = search_console_response.json().get("error", {}).get("message", str(http_err))
+#             logging.error(f"Error fetching Search Console data for {site_url}: {error_message}")
+#             failed_sites.append(site_url)
         
-#         # Store the response data for each site
-#         all_sites_data[site_url] = search_console_response.json()
+#         except Exception as e:
+#             logging.error(f"Unexpected error fetching data for {site_url}: {str(e)}")
+#             failed_sites.append(site_url)
 
-#     return all_sites_data
+#     if not all_sites_data and failed_sites:
+#         raise HTTPException(status_code=500, detail=f"Failed to fetch data from all sites: {', '.join(failed_sites)}")
+    
+#     return {
+#         "success": all_sites_data,
+#         "failed": failed_sites
+#     }
