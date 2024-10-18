@@ -4,7 +4,7 @@ import logging
 from urllib.parse import quote
 
 # Import the get_news_for_site function from news_fetcher.py
-from app.news_fetcher import get_news_for_site
+from app.news_fetcher import get_site_info
 
 def get_user_search_console_data(token: str):
     headers = {"Authorization": f"Bearer {token}"}
@@ -63,11 +63,12 @@ def get_user_search_console_data(token: str):
             search_console_data = search_console_response.json()
             
             # Get the top 5 news links or headlines for this site
-            news_data = get_news_for_site(site_url)
+            site_info = get_site_info(site_url)
 
             all_sites_data[site_url] = {
                 "search_console_data": search_console_data,
-                "news": news_data  # Include news results here
+                "site_info": site_info
+
             }
         
         except requests.exceptions.HTTPError as http_err:
