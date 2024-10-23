@@ -1,15 +1,15 @@
+<!-- templates/dashboard.html -->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WeBintel Dashboard</title>
+    <title>Dashboard</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>WeBintel Dashboard</h1>
-    
-    <div>
+    <h1>Analytics Dashboard</h1>
+
         <h2>Google Analytics Data</h2>
         <pre>{{ analytics_data | tojson(indent=2) }}</pre>
     </div>
@@ -19,5 +19,34 @@
         <pre>{{ search_console_data | tojson(indent=2) }}</pre>
     </div>
 
+    {% if lighthouse_data %}
+        <div class="lighthouse-metrics">
+            {% for site_metrics in lighthouse_data %}
+                {% if site_metrics.success and site_metrics.data %}
+                    <div class="site-metrics">
+                        <h3>{{ site_metrics.data.url }}</h3>
+                        <div class="performance-score">
+                            Performance Score: {{ site_metrics.data.performance_score }}%
+                        </div>
+                        <div class="core-vitals">
+                            <h4>Core Web Vitals:</h4>
+                            <ul>
+                                <li>FCP: {{ site_metrics.data.core_web_vitals.FCP|round(2) }}ms</li>
+                                <li>LCP: {{ site_metrics.data.core_web_vitals.LCP|round(2) }}ms</li>
+                                <li>TBT: {{ site_metrics.data.core_web_vitals.TBT|round(2) }}ms</li>
+                                <li>CLS: {{ site_metrics.data.core_web_vitals.CLS|round(4) }}</li>
+                            </ul>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="error-message">
+                        Failed to fetch metrics: {{ site_metrics.error }}
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No Lighthouse data available</p>
+    {% endif %}
 </body>
 </html>
