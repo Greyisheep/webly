@@ -1,167 +1,91 @@
-import os
+import xml.etree.ElementTree as ET
 import requests
 import logging
-import time
 from urllib.parse import quote
 from requests.exceptions import RequestException
-from datetime import datetime
-import json
 
-# Configuration
-GOOGLE_SEARCH_API_KEY = os.getenv("GOOGLE_SEARCH_API_KEY")
-GOOGLE_SEARCH_CX = os.getenv("GOOGLE_SEARCH_CX")
-
-# Enhanced retry decorator with logging
-def retry_request(func):
-    def wrapper(*args, **kwargs):
-        retries = 3
-        for attempt in range(retries):
-            try:
-                return func(*args, **kwargs)
-            except RequestException as e:
-                logging.error(f"Request failed ({attempt + 1}/{retries}) - {e}")
-                if attempt < retries - 1:
-                    time.sleep(2 ** attempt)  # Exponential backoff
-            except json.JSONDecodeError as e:
-                logging.error(f"JSON parsing failed ({attempt + 1}/{retries}) - {e}")
-                if attempt < retries - 1:
-                    time.sleep(2 ** attempt)
-        return None
-    return wrapper
-
-@retry_request
-def get_news_for_site(site_url: str):
+def fetch_google_rss_news(site_url: str):
     """
-    Fetch news articles for a given site using Google Custom Search API
-    """
-    query = f"{quote(site_url)} news"
-    params = {
-        'q': query,
-        'cx': GOOGLE_SEARCH_CX,
-        'key': GOOGLE_SEARCH_API_KEY,
-        'num': 5,
-        'tbm': 'nws',
-        'searchType': 'news',
-        'sort': 'date'
-    }
+    Fetch news articles for a given domain using Google News RSS feed
     
-    response = requests.get("https://www.googleapis.com/customsearch/v1", params=params)
-    response.raise_for_status()
-    search_results = response.json()
-
-    news_items = []
-    if 'items' in search_results:
-        for item in search_results['items']:
-            # Extract publication date from multiple possible locations
-            published_time = (
-                item.get('pagemap', {})
-                .get('metatags', [{}])[0]
-                .get('article:published_time') or
-                item.get('pagemap', {})
-                .get('newsarticle', [{}])[0]
-                .get('datepublished') or
-                'N/A'
-            )
-            
-            news_items.append({
-                "title": item.get("title"),
-                "link": item.get("link"),
-                "snippet": item.get("snippet"),
-                "source": item.get("displayLink"),
-                "published_time": published_time,
-                "publisher": item.get("publisher", {}).get("name", "Unknown")
-            })
+    Args:
+        domain (str): The domain to search for news
     
-    return news_items
-
-@retry_request
-def get_social_media_links_for_site(site_url: str):
-    """
-    Fetch social media links for a given site
-    """
-    query = f"{quote(site_url)} (facebook OR twitter OR linkedin OR instagram OR youtube)"
-    params = {
-        'q': query,
-        'cx': GOOGLE_SEARCH_CX,
-        'key': GOOGLE_SEARCH_API_KEY,
-        'num': 10
-    }
-
-    response = requests.get("https://www.googleapis.com/customsearch/v1", params=params)
-    response.raise_for_status()
-    search_results = response.json()
-
-    social_links = []
-    social_platforms = {
-        'facebook.com': 'Facebook',
-        'twitter.com': 'Twitter',
-        'linkedin.com': 'LinkedIn',
-        'instagram.com': 'Instagram',
-        'youtube.com': 'YouTube'
-    }
-
-    if 'items' in search_results:
-        for item in search_results.get('items', []):
-            link = item.get('link', '')
-            for platform_url, platform_name in social_platforms.items():
-                if platform_url in link:
-                    social_links.append({
-                        "platform": platform_name,
-                        "url": link,
-                        "title": item.get("title", ""),
-                        "snippet": item.get("snippet", "")
-                    })
-                    break
-
-    return social_links
-
-def get_site_info(site_url: str):
-    """
-    Integrate news and social media fetching with enhanced error handling
+    Returns:
+        list: A list of dictionaries containing news article details
     """
     try:
-        news = get_news_for_site(site_url) or []
-        social_links = get_social_media_links_for_site(site_url) or []
-
-        return {
-            "status": "success",
-            "timestamp": datetime.now().isoformat(),
-            "site_url": site_url,
-            "custom_search_news": news,
-            "social_media_links": social_links,
-            "total_news_found": len(news),
-            "total_social_links_found": len(social_links)
-        }
+        # Encode the domain to handle special characters
+        encoded_domain = quote(site_url)
+        
+        # Construct the Google News RSS URL
+        rss_url = f"https://news.google.com/rss/search?q={encoded_domain}"
+        
+        # Send GET request to fetch RSS feed
+        response = requests.get(rss_url)
+        response.raise_for_status()
+        
+        # Parse the XML response
+        root = ET.fromstring(response.content)
+        
+        # Find the channel element
+        channel = root.find('channel')
+        
+        # List to store news items
+        news_items = []
+        
+        # Iterate through items in the RSS feed
+        for item in channel.findall('item'):
+            # Extract title
+            title = item.find('title').text if item.find('title') is not None else 'N/A'
+            
+            # Extract link
+            link = item.find('link').text if item.find('link') is not None else 'N/A'
+            
+            # Extract description and source
+            description_elem = item.find('description')
+            description = 'N/A'
+            source = 'N/A'
+            
+            if description_elem is not None:
+                # The description contains an HTML-like structure
+                desc_text = description_elem.text
+                
+                # Try to extract source from the description
+                source_start = desc_text.find('<font color="#6f6f6f">') 
+                if source_start != -1:
+                    source_end = desc_text.find('</font>', source_start)
+                    if source_end != -1:
+                        source = desc_text[source_start + len('<font color="#6f6f6f">'): source_end]
+                
+                # Extract the link text
+                link_start = desc_text.find('">') 
+                link_end = desc_text.find('</a>', link_start)
+                if link_start != -1 and link_end != -1:
+                    description = desc_text[link_start + 2: link_end]
+            
+            # Extract publication date
+            pub_date = item.find('pubDate').text if item.find('pubDate') is not None else 'N/A'
+            
+            # Create news item dictionary
+            news_item = {
+                'title': title,
+                'link': link,
+                'description': description,
+                'source': source,
+                'pub_date': pub_date
+            }
+            
+            news_items.append(news_item)
+        
+        return news_items
+    
+    except RequestException as e:
+        logging.error(f"Request failed: {e}")
+        return []
+    except ET.ParseError as e:
+        logging.error(f"XML parsing failed: {e}")
+        return []
     except Exception as e:
-        logging.error(f"Error in get_site_info: {str(e)}")
-        return {
-            "status": "error",
-            "timestamp": datetime.now().isoformat(),
-            "site_url": site_url,
-            "error_message": str(e),
-            "custom_search_news": [],
-            "social_media_links": []
-        }
-
-def print_site_info(info):
-    """
-    Pretty print the site information
-    """
-    print(f"\n=== Site Information for {info['site_url']} ===")
-    print(f"Status: {info['status']}")
-    print(f"Timestamp: {info['timestamp']}")
-    
-    print("\n=== News Articles ===")
-    for i, article in enumerate(info['custom_search_news'], 1):
-        print(f"\n--- Article {i} ---")
-        print(f"Title: {article['title']}")
-        print(f"Source: {article.get('source', 'Unknown')}")
-        print(f"Published: {article.get('published_time', 'N/A')}")
-        print(f"Link: {article['link']}")
-        print(f"Snippet: {article['snippet']}")
-    
-    print("\n=== Social Media Links ===")
-    for link in info['social_media_links']:
-        print(f"\nPlatform: {link['platform']}")
-        print(f"URL: {link['url']}")
-        print(f"Title: {link.get('title', 'N/A')}")
+        logging.error(f"Unexpected error: {e}")
+        return []

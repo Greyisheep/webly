@@ -68,7 +68,7 @@ def get_lighthouse_metrics(url: str, api_key: str, retries: int = 3) -> Dict[str
             "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
             f"?url={clean_url}"
             f"&key={api_key}"
-            f"&strategy=mobile"
+            f"&strategy=desktop"
             f"&category=performance"
             f"&category=accessibility"
             f"&category=best-practices"
@@ -90,26 +90,51 @@ def get_lighthouse_metrics(url: str, api_key: str, retries: int = 3) -> Dict[str
                 
                 # Extract metrics
                 lighthouse_result = data.get('lighthouseResult', {})
+                
+                # Extract key fields
+                final_screenshot = lighthouse_result.get('audits', {}).get('final-screenshot', {}).get('details', {}).get('data')
                 performance_score = lighthouse_result.get('categories', {}).get('performance', {}).get('score', None)
-                
-                if performance_score is None:
-                    raise LighthouseMetricsError("No performance score found in response")
-                
-                # Extract core web vitals
+                seo_score = lighthouse_result.get('categories', {}).get('seo', {}).get('score', None)
+                accessibility_score = lighthouse_result.get('categories', {}).get('accessibility', {}).get('score', None)
+
                 metrics = lighthouse_result.get('audits', {})
-                core_web_vitals = {
+                performance_metrics = {
                     'FCP': metrics.get('first-contentful-paint', {}).get('numericValue'),
                     'LCP': metrics.get('largest-contentful-paint', {}).get('numericValue'),
+                    'SpeedIndex': metrics.get('speed-index', {}).get('numericValue'),
+                    'TTI': metrics.get('interactive', {}).get('numericValue'),
                     'TBT': metrics.get('total-blocking-time', {}).get('numericValue'),
                     'CLS': metrics.get('cumulative-layout-shift', {}).get('numericValue'),
+                }
+                
+                # Mobile vs. Desktop Performance
+                strategy = data.get('configSettings', {}).get('strategy', 'unknown')
+                
+                # SEO and Accessibility insights
+                seo_metrics = {
+                    'viewport': metrics.get('viewport', {}).get('score'),
+                    'font_size': metrics.get('font-size', {}).get('score'),
+                    'tap_targets': metrics.get('tap-targets', {}).get('score'),
+                    'meta_description': metrics.get('meta-description', {}).get('score'),
+                    'document_title': metrics.get('document-title', {}).get('score'),
+                }
+                accessibility_metrics = {
+                    'color_contrast': metrics.get('color-contrast', {}).get('score'),
                 }
                 
                 logging.info(f"Lighthouse metrics successfully fetched for {clean_url}")
                 
                 return {
                     'url': clean_url,
-                    'performance_score': round(performance_score * 100, 2),
-                    'core_web_vitals': core_web_vitals,
+                    'final_screenshot': final_screenshot,
+                    'performance_score': round(performance_score * 100, 2) if performance_score is not None else None,
+                    'seo_score': round(seo_score * 100, 2) if seo_score is not None else None,
+                    'accessibility_score': round(accessibility_score * 100, 2) if accessibility_score is not None else None,
+                    'core_web_vitals': performance_metrics,
+                    'seo_metrics': seo_metrics,
+                    'accessibility_metrics': accessibility_metrics,
+                    'strategy': strategy,
+                    'optimization_suggestions': metrics.get('opportunities', {}).get('details', {}).get('items', []),
                     'full_report': lighthouse_result
                 }
             except requests.exceptions.RequestException as e:

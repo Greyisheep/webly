@@ -1,10 +1,23 @@
+import os
 from fastapi import HTTPException
 import requests
 import logging
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
-# Import the get_site_info function from news_fetcher.py
-# from app.news_fetcher import get_site_info
+from app.lighthouse_metrics import get_lighthouse_metrics
+from app.news_fetcher import fetch_google_rss_news
+
+PAGE_SPEED_API_KEY = os.getenv("GOOGLE_SEARCH_API_KEY")
+
+def extract_domain(url: str) -> str:
+    """Extract the main domain from a URL or sc-domain: format"""
+    if url.startswith('sc-domain:'):
+        return url.replace('sc-domain:', '')
+    try:
+        parsed = urlparse(url)
+        return parsed.netloc or parsed.path
+    except Exception:
+        return url
 
 def get_user_search_console_data(token: str):
     headers = {"Authorization": f"Bearer {token}"}
@@ -18,33 +31,38 @@ def get_user_search_console_data(token: str):
             error_message = response.json().get("error", {}).get("message", "Unknown error")
         except ValueError:
             error_message = response.text
-        raise HTTPException(status_code=response.status_code, detail=f"Error fetching Search Console sites: {error_message}")
+        raise HTTPException(status_code=response.status_code, 
+                          detail=f"Error fetching Search Console sites: {error_message}")
 
     sites_data = response.json()
     
     if 'siteEntry' not in sites_data or not sites_data['siteEntry']:
         raise HTTPException(
             status_code=404, 
-            detail="No sites found for the user in Search Console. Ensure the user has access to a verified site."
+            detail="No sites found for the user in Search Console."
         )
     
-    # Initialize a dictionary to store the data for each site
+    # Initialize dictionaries to store the data
     all_sites_data = {}
-    failed_sites = []  # List to track sites that encountered errors
+    failed_sites = []
 
-    # Iterate over each site in the site list
+    # Iterate over each site
     for site in sites_data['siteEntry']:
         site_url = site['siteUrl'].rstrip('/')
         
-        # Skip if the URL is not in the correct format
-        if not (site_url.startswith("sc-domain:") or site_url.startswith("http://") or site_url.startswith("https://")):
-            continue  # Skip invalid URLs
+        # Skip invalid URLs
+        if not (site_url.startswith("sc-domain:") or 
+                site_url.startswith("http://") or 
+                site_url.startswith("https://")):
+            continue
         
-        # Determine the URL format for the API request
+        # Extract the domain for news fetching
+        domain = extract_domain(site_url)
+        
+        # Prepare the Search Console URL
         if site_url.startswith("sc-domain:"):
             search_console_data_url = f"https://www.googleapis.com/webmasters/v3/sites/{site_url}/searchAnalytics/query"
         else:
-            # URL encode the site URL
             encoded_site_url = quote(site_url, safe='')
             search_console_data_url = f"https://www.googleapis.com/webmasters/v3/sites/{encoded_site_url}/searchAnalytics/query"
         
@@ -56,33 +74,53 @@ def get_user_search_console_data(token: str):
         }
 
         try:
-            search_console_response = requests.post(search_console_data_url, headers=headers, json=data)
-            search_console_response.raise_for_status()  # Raises HTTPError for 4xx or 5xx responses
-            
-            # Store the response data for each site
+            # Fetch Search Console data
+            search_console_response = requests.post(
+                search_console_data_url, 
+                headers=headers, 
+                json=data
+            )
+            search_console_response.raise_for_status()
             search_console_data = search_console_response.json()
             
-            # Get the site information (news, social media, and Google News scraping)
-            # site_info = get_site_info(site_url)
-
+            # Fetch news data using the extracted domain
+            news_data = fetch_google_rss_news(domain)
+            lighthouse_data = get_lighthouse_metrics(domain, os.getenv("GOOGLE_SEARCH_API_KEY"))
+            
+            # Store both sets of data
             all_sites_data[site_url] = {
-                "search_console_data": search_console_data,
-                # "site_info": site_info
+                "search_console_data": search_console_data.get("rows", []),
+                "news_data": news_data if news_data else [],
+                "lighthouse_data": lighthouse_data if lighthouse_data else [],
+                "domain": domain
             }
-        
+            
+            # Log successful fetch
+            logging.info(f"Successfully fetched data for {domain}")
+            logging.debug(f"Found {len(news_data)} news items for {domain}")
+            
         except requests.exceptions.HTTPError as http_err:
-            error_message = search_console_response.json().get("error", {}).get("message", str(http_err))
-            logging.error(f"Error fetching Search Console data for {site_url}: {error_message}")
-            failed_sites.append(site_url)
-        
+            error_message = f"HTTP Error for {domain}: {str(http_err)}"
+            logging.error(error_message)
+            failed_sites.append({"site": site_url, "error": error_message})
+            
         except Exception as e:
-            logging.error(f"Unexpected error fetching data for {site_url}: {str(e)}")
-            failed_sites.append(site_url)
+            error_message = f"Unexpected error for {domain}: {str(e)}"
+            logging.error(error_message)
+            failed_sites.append({"site": site_url, "error": error_message})
 
     if not all_sites_data and failed_sites:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch data from all sites: {', '.join(failed_sites)}")
+        raise HTTPException(
+            status_code=500, 
+            detail={
+                "message": "Failed to fetch data from all sites",
+                "failed_sites": failed_sites
+            }
+        )
     
     return {
-        "success": all_sites_data,
-        "failed": failed_sites
+        "sites": all_sites_data,
+        "failed_sites": failed_sites,
+        "total_sites": len(all_sites_data),
+        "failed_count": len(failed_sites)
     }

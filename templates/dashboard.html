@@ -10,6 +10,7 @@
 <body>
     <h1>Analytics Dashboard</h1>
 
+    <div>
         <h2>Google Analytics Data</h2>
         <pre>{{ analytics_data | tojson(indent=2) }}</pre>
     </div>
@@ -25,17 +26,72 @@
                 {% if site_metrics.success and site_metrics.data %}
                     <div class="site-metrics">
                         <h3>{{ site_metrics.data.url }}</h3>
+
+                        <!-- Final Screenshot -->
+                        {% if site_metrics.data.final_screenshot %}
+                            <div class="screenshot">
+                                <h4>Final Screenshot</h4>
+                                <img src="{{ site_metrics.data.final_screenshot }}" alt="Final Screenshot">
+                            </div>
+                        {% endif %}
+
+                        <!-- Performance Score -->
                         <div class="performance-score">
-                            Performance Score: {{ site_metrics.data.performance_score }}%
+                            <strong>Performance Score:</strong> {{ site_metrics.data.performance_score }}%
                         </div>
+
+                        <!-- Core Web Vitals -->
                         <div class="core-vitals">
-                            <h4>Core Web Vitals:</h4>
+                            <h4>Core Web Vitals</h4>
                             <ul>
-                                <li>FCP: {{ site_metrics.data.core_web_vitals.FCP|round(2) }}ms</li>
-                                <li>LCP: {{ site_metrics.data.core_web_vitals.LCP|round(2) }}ms</li>
-                                <li>TBT: {{ site_metrics.data.core_web_vitals.TBT|round(2) }}ms</li>
-                                <li>CLS: {{ site_metrics.data.core_web_vitals.CLS|round(4) }}</li>
+                                <li>FCP: {{ site_metrics.data.core_web_vitals.FCP | round(2) }} ms</li>
+                                <li>LCP: {{ site_metrics.data.core_web_vitals.LCP | round(2) }} ms</li>
+                                <li>Speed Index: {{ site_metrics.data.core_web_vitals.SpeedIndex | round(2) }} ms</li>
+                                <li>TTI: {{ site_metrics.data.core_web_vitals.TTI | round(2) }} ms</li>
+                                <li>TBT: {{ site_metrics.data.core_web_vitals.TBT | round(2) }} ms</li>
+                                <li>CLS: {{ site_metrics.data.core_web_vitals.CLS | round(4) }}</li>
                             </ul>
+                        </div>
+
+                        <!-- SEO Metrics -->
+                        <div class="seo-metrics">
+                            <h4>SEO Metrics</h4>
+                            <div>SEO Score: {{ site_metrics.data.seo_score }}%</div>
+                            <ul>
+                                <li>Viewport: {{ site_metrics.data.seo_metrics.viewport | default('N/A') }}</li>
+                                <li>Font Size: {{ site_metrics.data.seo_metrics.font_size | default('N/A') }}</li>
+                                <li>Tap Targets: {{ site_metrics.data.seo_metrics.tap_targets | default('N/A') }}</li>
+                                <li>Meta Description: {{ site_metrics.data.seo_metrics.meta_description | default('N/A') }}</li>
+                                <li>Document Title: {{ site_metrics.data.seo_metrics.document_title | default('N/A') }}</li>
+                            </ul>
+                        </div>
+
+                        <!-- Accessibility Metrics -->
+                        <div class="accessibility-metrics">
+                            <h4>Accessibility Metrics</h4>
+                            <div>Accessibility Score: {{ site_metrics.data.accessibility_score }}%</div>
+                            <ul>
+                                <li>Color Contrast: {{ site_metrics.data.accessibility_metrics.color_contrast | default('N/A') }}</li>
+                            </ul>
+                        </div>
+
+                        <!-- Optimization Suggestions -->
+                        <div class="optimization-suggestions">
+                            <h4>Optimization Suggestions</h4>
+                            {% if site_metrics.data.optimization_suggestions %}
+                                <ul>
+                                    {% for suggestion in site_metrics.data.optimization_suggestions %}
+                                        <li>{{ suggestion.title }}: {{ suggestion.description }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p>No optimization suggestions available.</p>
+                            {% endif %}
+                        </div>
+
+                        <!-- Mobile vs Desktop Performance -->
+                        <div class="strategy">
+                            <strong>Performance Strategy:</strong> {{ site_metrics.data.strategy | capitalize }}
                         </div>
                     </div>
                 {% else %}
