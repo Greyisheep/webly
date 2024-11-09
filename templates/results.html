@@ -1,0 +1,21 @@
+<!-- templates/results.html -->
+<!DOCTYPE html>
+<html>
+<head><title>Results</title></head>
+<body>
+  <h1>Website Analysis Results</h1>
+  <div>
+    <h2>WHOIS Data</h2>
+    <pre>{{ whois_data }}</pre>
+  </div>
+  <div>
+    <h2>PageSpeed Metrics</h2>
+    <pre>{{ lighthouse_data }}</pre>
+  </div>
+  <div>
+    <h2>News</h2>
+    <pre>{{ news_data }}</pre>
+  </div>
+  <p>To see additional metrics, <a href="http://localhost:8000/auth">press here</a>.</p>
+</body>
+</html>

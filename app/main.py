@@ -1,5 +1,5 @@
 import logging
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -14,6 +14,9 @@ import json
 from datetime import datetime
 
 from app.analytics import get_user_analytics_data
+from app.domain_whois import get_whois_data
+from app.lighthouse_metrics import get_lighthouse_metrics
+from app.news_fetcher import fetch_google_rss_news
 from app.oauth import get_google_auth_url, get_google_token
 from app.search_console import get_user_search_console_data
 
@@ -98,71 +101,91 @@ def setup_logging():
 setup_logging()
 logger = logging.getLogger(__name__)
 
-async def fetch_lighthouse_metrics(site_url: str, api_key: str) -> Dict[str, Any]:
-    """
-    Asynchronously fetch Lighthouse metrics with enhanced error handling and debugging.
-    """
-    request_id = datetime.now().strftime('%Y%m%d_%H%M%S')
-    logger.info(f"[{request_id}] Starting Lighthouse metrics fetch for URL: {site_url}")
+# async def fetch_lighthouse_metrics(site_url: str, api_key: str) -> Dict[str, Any]:
+#     """
+#     Asynchronously fetch Lighthouse metrics with enhanced error handling and debugging.
+#     """
+#     request_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+#     logger.info(f"[{request_id}] Starting Lighthouse metrics fetch for URL: {site_url}")
     
+#     try:
+#         # Validate inputs
+#         if not site_url:
+#             raise ValueError("Empty URL provided")
+#         if not api_key:
+#             raise ValueError("API key not provided")
+            
+#         logger.debug(f"[{request_id}] API Key present: {bool(api_key)}, Length: {len(api_key)}")
+        
+#         # Clean URL
+#         clean_target = clean_url(site_url)
+#         logger.debug(f"[{request_id}] Cleaned URL: {clean_target}")
+        
+#         if not is_valid_url(clean_target):
+#             raise ValueError(f"Invalid URL after cleaning: {clean_target}")
+        
+#         # Import and use lighthouse_metrics module
+#         from app.lighthouse_metrics import get_lighthouse_metrics
+        
+#         # Fetch metrics with timeout
+#         try:
+#             metrics = await asyncio.wait_for(
+#                 asyncio.to_thread(get_lighthouse_metrics, clean_target, api_key),
+#                 timeout=120  # 2 minute timeout
+#             )
+            
+#             logger.info(f"[{request_id}] Successfully fetched metrics for {clean_target}")
+#             logger.debug(f"[{request_id}] Raw metrics: {json.dumps(metrics, indent=2)}")
+            
+#             return {
+#                 "success": True,
+#                 "data": serialize_data(metrics),
+#                 "error": None,
+#                 "request_id": request_id
+#             }
+            
+#         except asyncio.TimeoutError:
+#             logger.error(f"[{request_id}] Timeout while fetching metrics for {clean_target}")
+#             return {
+#                 "success": False,
+#                 "data": None,
+#                 "error": "Request timed out after 120 seconds",
+#                 "request_id": request_id
+#             }
+            
+#     except Exception as e:
+#         logger.exception(f"[{request_id}] Error fetching Lighthouse metrics for {site_url}")
+#         return {
+#             "success": False,
+#             "data": None,
+#             "error": str(e),
+#             "request_id": request_id
+#         }
+
+
+@app.get("/", response_class=HTMLResponse)
+async def get_homepage(request: Request):
+    return templates.TemplateResponse("homepage.html", {"request": request})
+
+@app.post("/process_url", response_class=HTMLResponse)
+async def process_url(request: Request, url: str = Form(...)):
+    clean_target = clean_url(url)
     try:
-        # Validate inputs
-        if not site_url:
-            raise ValueError("Empty URL provided")
-        if not api_key:
-            raise ValueError("API key not provided")
-            
-        logger.debug(f"[{request_id}] API Key present: {bool(api_key)}, Length: {len(api_key)}")
-        
-        # Clean URL
-        clean_target = clean_url(site_url)
-        logger.debug(f"[{request_id}] Cleaned URL: {clean_target}")
-        
-        if not is_valid_url(clean_target):
-            raise ValueError(f"Invalid URL after cleaning: {clean_target}")
-        
-        # Import and use lighthouse_metrics module
-        from app.lighthouse_metrics import get_lighthouse_metrics
-        
-        # Fetch metrics with timeout
-        try:
-            metrics = await asyncio.wait_for(
-                asyncio.to_thread(get_lighthouse_metrics, clean_target, api_key),
-                timeout=120  # 2 minute timeout
-            )
-            
-            logger.info(f"[{request_id}] Successfully fetched metrics for {clean_target}")
-            logger.debug(f"[{request_id}] Raw metrics: {json.dumps(metrics, indent=2)}")
-            
-            return {
-                "success": True,
-                "data": serialize_data(metrics),
-                "error": None,
-                "request_id": request_id
-            }
-            
-        except asyncio.TimeoutError:
-            logger.error(f"[{request_id}] Timeout while fetching metrics for {clean_target}")
-            return {
-                "success": False,
-                "data": None,
-                "error": "Request timed out after 120 seconds",
-                "request_id": request_id
-            }
-            
+        # Call synchronous functions within asyncio.to_thread for compatibility
+        news_data = await asyncio.to_thread(fetch_google_rss_news, clean_target)
+        whois_data = await asyncio.to_thread(get_whois_data, clean_target)
+        lighthouse_data = await asyncio.to_thread(get_lighthouse_metrics, clean_target, PAGE_SPEED_API_KEY)
     except Exception as e:
-        logger.exception(f"[{request_id}] Error fetching Lighthouse metrics for {site_url}")
-        return {
-            "success": False,
-            "data": None,
-            "error": str(e),
-            "request_id": request_id
-        }
-
-
-@app.get("/", response_class=RedirectResponse)
-async def root():
-    return RedirectResponse(url="/auth")
+        logger.error(f"Error processing URL {url}: {str(e)}")
+        raise HTTPException(status_code=400, detail="Error fetching metrics.")
+    
+    # Render result template with WHOIS and PageSpeed data
+    return templates.TemplateResponse("results.html", {
+        "request": request,
+        "news_data": serialize_data(news_data),
+        "whois_data": serialize_data(whois_data),
+        "lighthouse_data": serialize_data(lighthouse_data),
+    })
 
 
 @app.get("/auth")
@@ -182,7 +205,7 @@ async def oauth_callback(request: Request, code: str):
         
         analytics_data = {"success": False, "data": None, "error": None}
         search_console_data = {"success": False, "data": None, "error": None}
-        lighthouse_data = []
+        # lighthouse_data = []
 
         # Fetch and log analytics data
         try:
@@ -221,44 +244,11 @@ async def oauth_callback(request: Request, code: str):
             logger.error(f"[{request_id}] No valid site URLs found in Search Console data")
             raise ValueError("No valid sites found in Search Console data")
 
-        # Fetch Lighthouse metrics
-        if PAGE_SPEED_API_KEY:
-            logger.info(f"[{request_id}] Starting Lighthouse metrics fetch for {len(site_urls)} URLs")
-            tasks = []
-            for url in site_urls:
-                if is_valid_url(url):
-                    tasks.append(fetch_lighthouse_metrics(url, PAGE_SPEED_API_KEY))
-                else:
-                    logger.warning(f"[{request_id}] Skipping invalid URL: {url}")
-            
-            lighthouse_data = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            # Process and log results
-            for i, result in enumerate(lighthouse_data):
-                if isinstance(result, Exception):
-                    logger.error(f"[{request_id}] Lighthouse task failed for {site_urls[i]}: {result}")
-                    lighthouse_data[i] = {
-                        "success": False,
-                        "data": None,
-                        "error": str(result),
-                        "url": site_urls[i]
-                    }
-                else:
-                    logger.info(f"[{request_id}] Lighthouse task succeeded for {site_urls[i]}")
-        else:
-            logger.error("[{request_id}] PAGE_SPEED_API_KEY not configured")
-            lighthouse_data = [{
-                "success": False,
-                "data": None,
-                "error": "PageSpeed API key not configured",
-                "url": "N/A"
-            }]
-
         template_data = {
             "request_id": request_id,
             "analytics_data": analytics_data,
             "search_console_data": search_console_data,
-            "lighthouse_data": lighthouse_data,
+            # "lighthouse_data": lighthouse_data,
         }
         
         # Log template data structure before rendering

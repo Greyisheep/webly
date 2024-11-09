@@ -29,15 +29,9 @@ async def get_ga4_metrics_async(token: str, property_id: str):
     report_batches = [
         {
             "dimensions": [
-                {"name": "sessionSourceMedium"},
                 {"name": "sourceMedium"},
                 {"name": "source"},
                 {"name": "medium"},
-                {"name": "campaignName"},
-                {"name": "campaignId"},
-                {"name": "googleAdsCampaignId"},
-                {"name": "defaultChannelGroup"},
-                {"name": "primaryChannelGroup"},
             ],
             "metrics":[
                 {"name": "activeUsers"},
@@ -48,24 +42,19 @@ async def get_ga4_metrics_async(token: str, property_id: str):
 
         {
             "dimensions": [
-                {"name": "sessionSourceMedium"},
                 {"name": "country"},
-                {"name": "city"},
-                {"name": "region"},
-                {"name": "pagePath"},
-                {"name": "pageReferrer"},
-                {"name": "pageTitle"},
-                {"name": "percentScrolled"},
+                # {"name": "city"},
+                # {"name": "region"},
             ],
             "metrics":[
-                {"name": "keyEvents"},
                 {"name": "newUsers"},
                 {"name": "averageSessionDuration"},
                 {"name": "screenPageViews"},
                 {"name": "screenPageViewsPerSession"},
                 {"name": "userEngagementDuration"},
-                {"name": "eventCount"},
-                {"name": "eventCountPerUser"},
+                {"name": "activeUsers"},
+                {"name": "bounceRate"},
+                {"name": "totalUsers"},
             ]
         }
     ]

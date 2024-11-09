@@ -4,7 +4,7 @@ import logging
 from urllib.parse import quote
 from requests.exceptions import RequestException
 
-def fetch_google_rss_news(site_url: str):
+def fetch_google_rss_news(url: str):
     """
     Fetch news articles for a given domain using Google News RSS feed
     
@@ -16,7 +16,7 @@ def fetch_google_rss_news(site_url: str):
     """
     try:
         # Encode the domain to handle special characters
-        encoded_domain = quote(site_url)
+        encoded_domain = quote(url)
         
         # Construct the Google News RSS URL
         rss_url = f"https://news.google.com/rss/search?q={encoded_domain}"

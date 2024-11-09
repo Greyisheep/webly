@@ -1,12 +1,13 @@
+from http.client import HTTPException
 import os
-from fastapi import HTTPException
 import requests
 import logging
 from urllib.parse import quote, urlparse
-
+from app.utils import validate_url, map_sc_domain_to_canonical_url
 from app.lighthouse_metrics import get_lighthouse_metrics
 from app.news_fetcher import fetch_google_rss_news
 
+# Environment variable for API Key
 PAGE_SPEED_API_KEY = os.getenv("GOOGLE_SEARCH_API_KEY")
 
 def extract_domain(url: str) -> str:
