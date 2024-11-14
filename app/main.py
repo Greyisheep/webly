@@ -14,11 +14,14 @@ import json
 from datetime import datetime
 
 from app.analytics import get_user_analytics_data
+from app.description import get_page_title_and_description
 from app.domain_whois import get_whois_data
 from app.lighthouse_metrics import get_lighthouse_metrics
 from app.news_fetcher import fetch_google_rss_news
 from app.oauth import get_google_auth_url, get_google_token
 from app.search_console import get_user_search_console_data
+from app.ssl_audit import check_ssl
+from app.trends import get_keyword_trend, get_rising_queries
 
 # Custom timeout and Google API key
 DEFAULT_TIMEOUT = 60  # Timeout in seconds for API requests
@@ -175,6 +178,14 @@ async def process_url(request: Request, url: str = Form(...)):
         news_data = await asyncio.to_thread(fetch_google_rss_news, clean_target)
         whois_data = await asyncio.to_thread(get_whois_data, clean_target)
         lighthouse_data = await asyncio.to_thread(get_lighthouse_metrics, clean_target, PAGE_SPEED_API_KEY)
+        page_title_and_description = await asyncio.to_thread(get_page_title_and_description, clean_target)
+        ssl_audit = await asyncio.to_thread(check_ssl, clean_target)
+        trend_data = await asyncio.to_thread(get_keyword_trend, clean_target)
+        trend_data_json = {
+            "dates": trend_data.index.strftime('%Y-%m-%d').tolist(),  # Convert dates to strings
+            "popularity": trend_data[clean_target].tolist()          # Use the actual keyword name
+        }
+        rising_queries = await asyncio.to_thread(get_rising_queries, clean_target)
     except Exception as e:
         logger.error(f"Error processing URL {url}: {str(e)}")
         raise HTTPException(status_code=400, detail="Error fetching metrics.")
@@ -185,6 +196,10 @@ async def process_url(request: Request, url: str = Form(...)):
         "news_data": serialize_data(news_data),
         "whois_data": serialize_data(whois_data),
         "lighthouse_data": serialize_data(lighthouse_data),
+        "page_title_and_description": serialize_data(page_title_and_description),
+        "ssl_audit": serialize_data(ssl_audit),
+        # "trend_data": serialize_data(trend_data_json),
+        "rising_queries": serialize_data(rising_queries)
     })
 
 
