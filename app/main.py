@@ -20,8 +20,9 @@ from app.lighthouse_metrics import get_lighthouse_metrics
 from app.news_fetcher import fetch_google_rss_news
 from app.oauth import get_google_auth_url, get_google_token
 from app.search_console import get_user_search_console_data
+from app.socials import get_social_media_info
 from app.ssl_audit import check_ssl
-from app.trends import get_keyword_trend, get_rising_queries
+from app.trends import analyze_keyword, get_keyword_trend, get_rising_queries
 
 # Custom timeout and Google API key
 DEFAULT_TIMEOUT = 60  # Timeout in seconds for API requests
@@ -179,18 +180,25 @@ async def process_url(request: Request, url: str = Form(...)):
         whois_data = await asyncio.to_thread(get_whois_data, clean_target)
         lighthouse_data = await asyncio.to_thread(get_lighthouse_metrics, clean_target, PAGE_SPEED_API_KEY)
         page_title_and_description = await asyncio.to_thread(get_page_title_and_description, clean_target)
-        ssl_audit = await asyncio.to_thread(check_ssl, clean_target)
-        trend_data = await asyncio.to_thread(get_keyword_trend, clean_target)
-        trend_data_json = {
-            "dates": trend_data.index.strftime('%Y-%m-%d').tolist(),  # Convert dates to strings
-            "popularity": trend_data[clean_target].tolist()          # Use the actual keyword name
-        }
-        rising_queries = await asyncio.to_thread(get_rising_queries, clean_target)
+        ssl_audit = await asyncio.to_thread(check_ssl, url)
+        social_links = await asyncio.to_thread(get_social_media_info, clean_target)
+        
+        # Use the new analyze_keyword function from trends.py
+        trend_data, rising_queries = await asyncio.to_thread(analyze_keyword, clean_target)
+        
+        # Process trend data if it exists
+        trend_data_json = None
+        if trend_data is not None:
+            trend_data_json = {
+                "dates": trend_data.index.strftime('%Y-%m-%d').tolist(),
+                "popularity": trend_data[clean_target].tolist()
+            }
+
     except Exception as e:
         logger.error(f"Error processing URL {url}: {str(e)}")
         raise HTTPException(status_code=400, detail="Error fetching metrics.")
     
-    # Render result template with WHOIS and PageSpeed data
+    # Render result template with all data
     return templates.TemplateResponse("results.html", {
         "request": request,
         "news_data": serialize_data(news_data),
@@ -198,8 +206,9 @@ async def process_url(request: Request, url: str = Form(...)):
         "lighthouse_data": serialize_data(lighthouse_data),
         "page_title_and_description": serialize_data(page_title_and_description),
         "ssl_audit": serialize_data(ssl_audit),
-        # "trend_data": serialize_data(trend_data_json),
-        "rising_queries": serialize_data(rising_queries)
+        "social_links": serialize_data(social_links),
+        "trend_data": serialize_data(trend_data_json) if trend_data_json else None,
+        "rising_queries": serialize_data(rising_queries) if rising_queries is not None else None
     })
 
 
